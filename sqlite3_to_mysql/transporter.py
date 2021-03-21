@@ -60,6 +60,8 @@ class SQLite3toMySQL:
             else (kwargs.get("without_foreign_keys") or False)
         )
 
+        self._dolt_compatible = kwargs.get("dolt_compatible") or False
+
         self._mysql_user = str(kwargs.get("mysql_user"))
 
         self._mysql_password = (
@@ -131,10 +133,10 @@ class SQLite3toMySQL:
 
             self._mysql_version = self._get_mysql_version()
             self._mysql_json_support = self._check_mysql_json_support(
-                self._mysql_version
+                self._mysql_version, self._dolt_compatible
             )
             self._mysql_fulltext_support = self._check_mysql_fulltext_support(
-                self._mysql_version
+                self._mysql_version, self._dolt_compatible
             )
 
             if self._use_fulltext and not self._mysql_fulltext_support:
@@ -177,7 +179,9 @@ class SQLite3toMySQL:
             raise
 
     @staticmethod
-    def _check_mysql_json_support(version_string):
+    def _check_mysql_json_support(version_string, dolt_compatible=False):
+        if dolt_compatible:
+            return False
         mysql_version = version.parse(re.sub("-.*$", "", version_string))
 
         if version_string.lower().endswith("-mariadb"):
@@ -195,7 +199,9 @@ class SQLite3toMySQL:
         return False
 
     @staticmethod
-    def _check_mysql_fulltext_support(version_string):
+    def _check_mysql_fulltext_support(version_string, dolt_compatible=False):
+        if dolt_compatible:
+            return False
         mysql_version = version.parse(re.sub("-.*$", "", version_string))
 
         if version_string.lower().endswith("-mariadb"):
@@ -340,6 +346,8 @@ class SQLite3toMySQL:
 
         try:
             self._mysql_cur.execute(sql)
+            if self._dolt_compatible:
+                self._mysql_cur.fetchall()
             self._mysql.commit()
         except mysql.connector.Error as err:
             self._logger.error("MySQL failed creating table %s: %s", table_name, err)
@@ -582,11 +590,14 @@ class SQLite3toMySQL:
                         )
                     )
                     columns = [column[0] for column in self._sqlite_cur.description]
+                    insert_stmt = "INSERT" if self._dolt_compatible else \
+                        "INSERT IGNORE"
                     sql = """
-                        INSERT IGNORE
+                        {insert}
                         INTO `{table}` ({fields})
                         VALUES ({placeholders})
                     """.format(
+                        insert=insert_stmt,
                         table=table["name"],
                         fields=("`{}`, " * len(columns)).rstrip(" ,").format(*columns),
                         placeholders=("%s, " * len(columns)).rstrip(" ,"),

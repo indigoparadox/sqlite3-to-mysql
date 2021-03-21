@@ -63,6 +63,7 @@ from .debug_info import info
 )
 @click.option("-l", "--log-file", type=click.Path(), help="Log file")
 @click.option("-q", "--quiet", is_flag=True, help="Quiet. Display only errors.")
+@click.option("-o", "--dolt-compatible", is_flag=True, help="Be compatible with dolt.")
 @click.version_option(
     message=tabulate(info(), headers=["software", "version"], tablefmt="github")
 )
@@ -82,6 +83,7 @@ def cli(
     chunk,
     log_file,
     quiet,
+    dolt_compatible,
 ):
     """Transfer SQLite to MySQL using the provided CLI options."""
     try:
@@ -102,6 +104,7 @@ def cli(
             chunk=chunk,
             log_file=log_file,
             quiet=quiet,
+            dolt_compatible=dolt_compatible,
         )
         converter.transfer()
     except KeyboardInterrupt:
